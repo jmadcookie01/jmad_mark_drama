@@ -294,6 +294,7 @@ class MarkDramaFlashcards:
         # Select a random question from the dictionary
         self.mode2_question_number = random.choice(list(self.mode2_correct_answers.keys()))
         self.mode2_correct_answer = self.mode2_correct_answers[self.mode2_question_number]
+        self.questions = self.get_questions(mode=2)
         self.create_mode2_window()
 
     def create_mode2_window(self):
@@ -301,8 +302,9 @@ class MarkDramaFlashcards:
         self.reset_score()
         self.mode2_window.title("Mark Drama Multi-Choice")
         self.mode2_window.geometry("800x480")  # Adjusted window size
+
         self.mode2_question_label = tk.Label(self.mode2_window,
-                                             text=f"What is the letter for {self.mode2_question_number}?",
+                                             text=f"What comes after ERROR / BROKEN?",
                                              font=("Helvetica", 16))
         self.mode2_question_label.grid(row=0, column=0, columnspan=2, pady=20)
 
@@ -325,7 +327,7 @@ class MarkDramaFlashcards:
             self.mode2_answer_buttons.append(answer_button)
 
         # Text frame for answer feedback
-        self.feedback_text_frame = tk.Text(self.mode2_window, font=("Helvetica", 14), wrap=tk.WORD, height=6, width=24)
+        self.feedback_text_frame = tk.Text(self.mode2_window, font=("Helvetica", 8), wrap=tk.WORD, height=16, width=47)
         self.feedback_text_frame.grid(row=1, column=2, rowspan=3, padx=20, pady=10)
 
         # Create "Next Question" button
@@ -383,10 +385,18 @@ class MarkDramaFlashcards:
         self.update_mode2_question()
 
     def update_mode2_question(self):
-        self.mode2_question_label.config(text=f"What is the letter for {self.mode2_question_number}?", fg="black")
+        print(self.questions)
+        # Pick a Part
+        self.random_part = random.choice(list(self.questions.keys()))
+        # Generate a Question Based on Events in that Part
+        the_question = self.questions[self.random_part]
+        self.random_question = random.choice(the_question)
+
+        self.mode2_question_label.config(text=f"What comes after {self.random_question}?", fg="black")
 
         # Generate new answer options
         answer_options = list(self.mode2_correct_answers.values())[:4]
+        #answer_options = the_question[:4]
         random.shuffle(answer_options)
 
         # Ensure the correct answer is in the answer options
