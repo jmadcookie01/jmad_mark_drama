@@ -16,8 +16,6 @@ Code Notes:
  - Mode2 is "Multiple Choice"
 
 """
-
-
 import tkinter as tk
 from tkinter import *
 
@@ -25,13 +23,28 @@ import random
 
 
 class MarkDramaFlashcards:
-    def __init__(self, root):
+    def __init__(self, root, _dialogue, _events):
+        self.questions = dict()
+        self.dialogue = _dialogue
+        self.random_question = None
+        self.random_part = None
+        self.events = _events
+        self.root = root
+        self.root.title("Mark Drama Game")
+        self.root.geometry("800x600")  # Set default window size
+        self.parts_to_include = []
+        self.create_title_screen()
+        self.load_mode2_correct_answers()  # Load correct answers for Mode 2
+        self.score = dict()
+        self.reset_score()
+
+        # Initialize everything else as per PEP-8 style guide (well, almost everything)
         self.feedback_text_frame = None
         self.mode2_answer_buttons = None
         self.mode2_question_number = None
         self.mode2_correct_answer = None
         self.score_label = None
-        self.mode2_correct_answers = None
+
         self.mode2_window = None
         self.mode2_question_label = None
         self.next_question_button = None
@@ -45,14 +58,8 @@ class MarkDramaFlashcards:
         self.mode1_user_answer = None
         self.mode1_question = None
         self.mode1_next_button = None
-        self.root = root
-        self.root.title("Mark Drama Game")
-        self.root.geometry("800x600")  # Set default window size
-        self.parts_to_include = []
-        self.create_title_screen()
-        self.load_mode2_correct_answers()  # Load correct answers for Mode 2
-        self.score = dict()
-        self.reset_score()
+        self.selected_dialogue = None
+        self.selected_parts = None
 
     def reset_score(self):
         self.score = {"correct": 0, "total": 0}  # Initialize score
@@ -86,11 +93,11 @@ class MarkDramaFlashcards:
                                              variable=jesus_mode_var)
         jesus_mode_checkbox.grid(row=0, column=0, padx=10)  # Grid layout for the first checkbox
 
-        # Checkbox for "Extra Jesus Dialogue" in italics
-        extra_hard_mode_var = tk.IntVar()
-        extra_hard_mode_checkbox = tk.Checkbutton(checkboxes_frame, text="Extra Jesus Dialogue",
-                                                  font=("Helvetica", 12, "italic"), variable=extra_hard_mode_var)
-        extra_hard_mode_checkbox.grid(row=0, column=1, padx=10)  # Grid layout for the second checkbox
+        # Checkbox for "Pharisee Dialogue" in italics
+        pharisee_mode = tk.IntVar()
+        pharisee_mode_checkbox = tk.Checkbutton(checkboxes_frame, text="Pharisee Dialogue",
+                                                font=("Helvetica", 12, "italic"), variable=pharisee_mode)
+        pharisee_mode_checkbox.grid(row=0, column=1, padx=10)  # Grid layout for the second checkbox
 
         divider = tk.Frame(self.root, height=2, bg="black")
         divider.pack(fill=tk.X, padx=20, pady=10)  # Divider below the buttons
@@ -117,6 +124,27 @@ class MarkDramaFlashcards:
         else:
             self.parts_to_include.append(part_number)
 
+    def get_questions(self, mode=1):
+        questions = dict()
+        if not self.parts_to_include:
+            print("No parts given, defaulting to the first 3 of them")
+            self.parts_to_include = [1, 2, 3]
+        mode_name = "Flashcards" if mode == 1 else "Multichoice"
+        print(f"Launching {mode_name} with parts: {self.parts_to_include}")
+
+        if mode == 1:
+            for k in self.dialogue.keys():
+                part_num = NUMBER_MAP[k]
+                if part_num in self.parts_to_include:
+                    questions[k] = self.dialogue[k]
+        if mode == 2:
+            for k in self.events.keys():
+                part_num = NUMBER_MAP[k]
+                if part_num in self.parts_to_include:
+                    questions[k] = self.events[k]
+
+        return questions
+
     # ---------------------------------------------------------------------------------------------------------------- #
     # Mode 1 Starts Here
 
@@ -127,6 +155,7 @@ class MarkDramaFlashcards:
         self.mode1_correct_answer = "The correct answer has appeared."
 
     def start_mode1(self):
+        self.questions = self.get_questions()
         self.reset_score()
         self.reset_mode1()
         self.create_mode1_window()
@@ -135,7 +164,7 @@ class MarkDramaFlashcards:
         self.reset_score()
         self.mode1_window = Toplevel(self.root)
         self.mode1_window.title("Mark Drama Flashcards")
-        self.mode1_window.geometry("640x480")  # Set default window size
+        self.mode1_window.geometry("800x800")  # Set default window size
 
         # Create a frame to hold widgets that use grid
         grid_frame = Frame(self.mode1_window)
@@ -150,13 +179,11 @@ class MarkDramaFlashcards:
         self.mode1_entry = Text(grid_frame, font=("Helvetica", 12), wrap=WORD, height=6, width=60)
         self.mode1_entry.grid(row=1, column=1, pady=10, columnspan=2)
 
-        reveal_answer_button = Button(grid_frame, text="Reveal Answer", font=("Helvetica", 12),
+        self.reveal_answer_button = Button(grid_frame, text="Reveal Answer", font=("Helvetica", 12),
                                       command=self.reveal_mode1_answer)
-        reveal_answer_button.grid(row=2, column=1, pady=10, columnspan=2)
+        self.reveal_answer_button.grid(row=2, column=1, pady=10, columnspan=2)
 
-        # ... (your other widgets)
-
-        self.mode1_feedback_text = Text(grid_frame, font=("Helvetica", 12), wrap=WORD, height=6, width=60)
+        self.mode1_feedback_text = Text(grid_frame, font=("Helvetica", 12), wrap=WORD, height=16, width=60)
         self.mode1_feedback_text.grid(row=4, column=1, pady=10, columnspan=2)
 
         # Create a scrollbar for the feedback text widget
@@ -184,7 +211,15 @@ class MarkDramaFlashcards:
 
     def reveal_mode1_answer(self):
         # Get the correct answer
-        correct_answer = "The correct answer is: This is the correct answer.\n"*12
+        if self.random_question:
+            answers = self.questions[self.random_part][self.random_question]
+            correct_answer = ""
+            for i in answers:
+                correct_answer += f"{i}\n"
+            if correct_answer[0].strip() == "":
+                correct_answer = ["Entry is blank, Jesus probably has no dialogue in this scene."]
+        else:
+            correct_answer = ["(Entry is Blank, does nothing happen?)"]
 
         # Clear the feedback field and set the correct answer
         self.mode1_feedback_text.config(state=tk.NORMAL)
@@ -195,10 +230,20 @@ class MarkDramaFlashcards:
         # Enable "Right/Wrong" button after revealing the answer
         self.correct_button.config(state=tk.NORMAL)
         self.wrong_button.config(state=tk.NORMAL)
+        self.reveal_answer_button.config(state=tk.DISABLED)
 
     def update_mode1_question(self):
-        # Generate a new question (for now, just a placeholder)
-        new_question = "This is a new question." + str(random.randint(1, 100))
+        # Pick a Part
+        self.random_part = random.choice(list(self.questions.keys()))
+        # Generate a Question Based on Events in that Part
+        the_question = self.questions[self.random_part]
+        try:
+            self.random_question = random.choice(list(the_question.keys()))
+        except IndexError:
+            print("This is causing trouble: ", the_question)
+            exit()
+        new_question = f"[{self.random_question}]" + \
+                       "\n What does Jesus do here?"
 
         # Clear the user's input field and update the question
         self.mode1_entry.delete(1.0, tk.END)
@@ -213,6 +258,7 @@ class MarkDramaFlashcards:
         self.mode1_next_button.config(state=tk.DISABLED)
         self.correct_button.config(state=tk.DISABLED)
         self.wrong_button.config(state=tk.DISABLED)
+        self.reveal_answer_button.config(state=tk.NORMAL)
 
     def correct_mode1_answer(self):
         self.score["correct"] += 1
@@ -359,7 +405,75 @@ class MarkDramaFlashcards:
         self.next_question_button.config(state=tk.DISABLED)  # Disable "Next Question" button for the new question
 
 
+def parse_event_order_to_dict():
+    # Take my event order notes and turn them into a dict.
+    # Initialize an empty dictionary to store the entries
+    entries = {}
+    current_part = None  # Initialize a variable to keep track of the current part
+
+    # Open the file for reading
+    with open('mark_learning_event_order.txt', 'r') as file:
+        for line in file:
+            # Check if the line starts with "="
+            if line.startswith('=') or not line.strip():
+                # Ignore lines starting with "="
+                continue
+            # Check if the line starts with " -"
+            elif line.startswith(' -'):
+                # If it starts with " -", add it to the current part
+                entries[current_part].append(line.strip()[2:])
+            else:
+                # If it doesn't start with " -", it's a new part
+                current_part = line.replace(":", "").strip()
+                entries[current_part] = []
+    return entries
+
+
+def parse_dialogue_to_dict():
+    # Take my dialogue notes for Jesus and turn them into a dict.
+    # Initialize an empty dictionary to store the entries
+    entries = {}
+    current_part = None
+    current_event = None
+
+    # Open the file for reading
+    with open('mark_learning_dialogue.txt', 'r') as file:
+        for line in file:
+            # Check if the line starts with "=" or "#"
+            if line.startswith('=') or not line.strip() or line.startswith("#"):
+                # Ignore lines starting with "="
+                continue
+            # Check if the line starts with " -"
+            elif line.startswith('['):
+                # If it doesn't start with " -", it's a new part
+                current_part = line.replace('[', "").replace(']', "").strip()
+                entries[current_part] = {}
+            elif line.startswith(' -') or line.startswith('-'):
+                current_event = line.replace("-", "").strip()
+                entries[current_part][current_event] = []
+            else:
+                # Its dialogue or event notes.
+                if not line.startswith("*") and not line.startswith("'"):
+                    # JC is Jesus Christ
+                    line = "JC: " + line
+                entries[current_part][current_event].append(line.strip())
+    return entries
+
+
 if __name__ == "__main__":
+    NUMBER_MAP = {
+        1: "Part One",
+        2: "Part Two",
+        3: "Part Three",
+        4: "Part Four",
+        5: "Part Five",
+        6: "Part Six"
+    }
+    INVERTED_NUMBER_MAP = {v: k for k, v in NUMBER_MAP.items()}
+    NUMBER_MAP = {**NUMBER_MAP, **INVERTED_NUMBER_MAP}
+
+    events = parse_event_order_to_dict()
+    dialogue = parse_dialogue_to_dict()
     _root = tk.Tk()
-    game = MarkDramaFlashcards(_root)
+    game = MarkDramaFlashcards(_root, _dialogue=dialogue, _events=events)
     _root.mainloop()
