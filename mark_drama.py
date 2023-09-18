@@ -17,9 +17,12 @@ Code Notes:
 
 """
 import tkinter as tk
+import tkinter.messagebox as msg
 from tkinter import *
 
 import random
+
+UNEXPECTED_ERROR_MSG = "Unexpected error, sorry! Tell Josh or someone who knows python."
 
 
 class MarkDramaFlashcards:
@@ -29,12 +32,12 @@ class MarkDramaFlashcards:
         self.random_question = None
         self.random_part = None
         self.events = _events
+        self.event_sequence = []
         self.root = root
         self.root.title("Mark Drama Game")
         self.root.geometry("800x600")  # Set default window size
         self.parts_to_include = []
         self.create_title_screen()
-        self.load_mode2_correct_answers()  # Load correct answers for Mode 2
         self.score = dict()
         self.reset_score()
 
@@ -42,11 +45,14 @@ class MarkDramaFlashcards:
         self.feedback_text_frame = None
         self.mode2_answer_buttons = None
         self.mode2_question_number = None
+        self.mode2_answer_label = None
         self.mode2_correct_answer = None
         self.score_label = None
 
         self.mode2_window = None
         self.mode2_question_label = None
+        self.mode2_question = None
+        self.mode2_answer_options = None
         self.next_question_button = None
         self.correct_button = None
         self.wrong_button = None
@@ -126,9 +132,6 @@ class MarkDramaFlashcards:
 
     def get_questions(self, mode=1):
         questions = dict()
-        if not self.parts_to_include:
-            print("No parts given, defaulting to the first 3 of them")
-            self.parts_to_include = [1, 2, 3]
         mode_name = "Flashcards" if mode == 1 else "Multichoice"
         print(f"Launching {mode_name} with parts: {self.parts_to_include}")
 
@@ -137,17 +140,26 @@ class MarkDramaFlashcards:
                 part_num = NUMBER_MAP[k]
                 if part_num in self.parts_to_include:
                     questions[k] = self.dialogue[k]
-        if mode == 2:
-            for k in self.events.keys():
-                part_num = NUMBER_MAP[k]
-                if part_num in self.parts_to_include:
-                    questions[k] = self.events[k]
-
-        return questions
+            return questions
+        # Mode is 2
+        event_sequence = []
+        for k in self.events.keys():
+            part_num = NUMBER_MAP[k]
+            if part_num in self.parts_to_include:
+                questions[k] = self.events[k]
+                for i in self.events[k]:
+                    event_sequence.append(i)
+        if any([event_sequence.count(i) >= 2 for i in event_sequence]):
+            duped_scenes = list()
+            duped_scenes.append(list(i for i in event_sequence if event_sequence.count(i) >= 2))
+            problem = f"Hey! Please make sure your scene names in the event order text file are unique. " \
+                      f"I found these ones at least twice: {duped_scenes}"
+            msg.showerror("Error with your Event Order TextFile", problem)
+            raise KeyError(problem)
+        return questions, event_sequence
 
     # ---------------------------------------------------------------------------------------------------------------- #
     # Mode 1 Starts Here
-
     def reset_mode1(self):
         self.mode1_question = "This is a question."
         self.mode1_user_answer = tk.StringVar()
@@ -155,6 +167,9 @@ class MarkDramaFlashcards:
         self.mode1_correct_answer = "The correct answer has appeared."
 
     def start_mode1(self):
+        if not self.parts_to_include:
+            print("No parts given, will default to just part 1")
+            self.toggle_part(1)
         self.questions = self.get_questions()
         self.reset_score()
         self.reset_mode1()
@@ -180,7 +195,7 @@ class MarkDramaFlashcards:
         self.mode1_entry.grid(row=1, column=1, pady=10, columnspan=2)
 
         self.reveal_answer_button = Button(grid_frame, text="Reveal Answer", font=("Helvetica", 12),
-                                      command=self.reveal_mode1_answer)
+                                           command=self.reveal_mode1_answer)
         self.reveal_answer_button.grid(row=2, column=1, pady=10, columnspan=2)
 
         self.mode1_feedback_text = Text(grid_frame, font=("Helvetica", 12), wrap=WORD, height=16, width=60)
@@ -241,6 +256,7 @@ class MarkDramaFlashcards:
             self.random_question = random.choice(list(the_question.keys()))
         except IndexError:
             print("This is causing trouble: ", the_question)
+            msg.showerror("Oops", UNEXPECTED_ERROR_MSG)
             exit()
         new_question = f"[{self.random_question}]" + \
                        "\n What does Jesus do here?"
@@ -278,75 +294,79 @@ class MarkDramaFlashcards:
     # ---------------------------------------------------------------------------------------------------------------- #
     # Mode 2 Starts Here
 
-    def load_mode2_correct_answers(self):
-        self.mode2_correct_answers = {
-            "1": "A",
-            "2": "B",
-            "3": "C",
-            "4": "D",
-            "5": "E",
-            "6": "F",
-            "7": "G",
-            "8": "H",
-        }
-
     def start_mode2(self):
+        if not self.parts_to_include:
+            print("No parts given, will default to just part 1")
+            self.toggle_part(1)
         # Select a random question from the dictionary
-        self.mode2_question_number = random.choice(list(self.mode2_correct_answers.keys()))
-        self.mode2_correct_answer = self.mode2_correct_answers[self.mode2_question_number]
-        self.questions = self.get_questions(mode=2)
+        self.questions, self.event_sequence = self.get_questions(mode=2)
+        self.mode2_question = random.choice(self.event_sequence)
         self.create_mode2_window()
 
     def create_mode2_window(self):
+        row = 0
         self.mode2_window = tk.Toplevel(self.root)
         self.reset_score()
         self.mode2_window.title("Mark Drama Multi-Choice")
-        self.mode2_window.geometry("800x480")  # Adjusted window size
+        self.mode2_window.geometry("1100x640")
 
         self.mode2_question_label = tk.Label(self.mode2_window,
-                                             text=f"What comes after ERROR / BROKEN?",
+                                             text=f"What comes immediately after ERROR / BROKEN?",
                                              font=("Helvetica", 16))
-        self.mode2_question_label.grid(row=0, column=0, columnspan=2, pady=20)
+        self.mode2_question_label.grid(row=row, column=0, columnspan=2, pady=20)
+        row += 1
 
-        # Generate new answer options
-        answer_options = list(self.mode2_correct_answers.values())
-        random.shuffle(answer_options)
-
-        # Ensure the correct answer is in the answer options
-        if self.mode2_correct_answer not in answer_options:
-            # Replace one of the random answers with the correct answer
-            random_index = random.randint(0, 3)
-            answer_options[random_index] = self.mode2_correct_answer
+        potential_answers = ["A: A long piece of dialogue that is longer than most",
+                             "B: A long piece of dialogue that is longer than most",
+                             "C: A long piece of dialogue that is longer than most",
+                             "D: A long piece of dialogue that is longer than most"]
+        self.mode2_answer_label = tk.Label(self.mode2_window,
+                                           text="\n".join(potential_answers),
+                                           font=("Helvetica", 14))
+        self.mode2_answer_label.grid(row=row, column=0, columnspan=2, pady=20)
+        row += 1
+        abcd = ['A', 'B', 'C', 'D']
 
         self.mode2_answer_buttons = []
 
         for i in range(4):
-            answer_button = tk.Button(self.mode2_window, text=answer_options[i], font=("Helvetica", 14),
-                                      command=lambda ans=answer_options[i]: self.check_mode2_answer(ans), padx=80)
-            answer_button.grid(row=i // 2 + 1, column=i % 2, padx=20, pady=10)
+            answer_button = tk.Button(self.mode2_window, text=abcd[i], font=("Helvetica", 14),
+                                      command=lambda ans=abcd[i]: self.check_mode2_answer(ans), padx=80)
+            answer_button.grid(row=i // 2 + row, column=i % 2, padx=20, pady=10)
             self.mode2_answer_buttons.append(answer_button)
+        row += 2
 
         # Text frame for answer feedback
-        self.feedback_text_frame = tk.Text(self.mode2_window, font=("Helvetica", 8), wrap=tk.WORD, height=16, width=47)
+        self.feedback_text_frame = tk.Text(self.mode2_window, font=("Helvetica", 10), wrap=tk.WORD, height=24, width=60)
         self.feedback_text_frame.grid(row=1, column=2, rowspan=3, padx=20, pady=10)
 
         # Create "Next Question" button
         self.next_question_button = tk.Button(self.mode2_window, text="Next Question", font=("Helvetica", 16),
                                               command=self.next_mode2_question)
-        self.next_question_button.grid(row=4, column=0, columnspan=2, pady=10)
+        self.next_question_button.grid(row=row, column=0, columnspan=2, pady=10)
         self.next_question_button.config(state=tk.DISABLED)  # Initially disabled
-
+        row += 1
         # Create the Score Label
         self.score_label = tk.Label(self.mode2_window, text="Score for this Session: 0/0 correct",
                                     font=("Helvetica", 14))
-        self.score_label.grid(row=5, column=0, columnspan=2, pady=10)
+        self.score_label.grid(row=row, column=0, columnspan=2, pady=10)
+        row += 1
         self.update_mode2_question()
 
     def check_mode2_answer(self, user_answer):
         self.feedback_text_frame.config(state=tk.NORMAL)
         self.feedback_text_frame.delete(1.0, tk.END)  # Clear previous content
 
-        if user_answer == self.mode2_correct_answer:
+        split = self.mode2_answer_options.split("\n")
+        letter_pairs = [(i[:1], i[3:].strip()) for i in split if i]
+        _answers = [{v: k} for k, v in letter_pairs]
+        answers = dict()
+        for answer in _answers:
+            answers.update(answer)
+        alternatives = {v: k for k, v in answers.items()}
+        correct_answer = answers[self.mode2_correct_answer]
+
+        if user_answer == correct_answer:
             feedback = random.choice(["You got it!", "Correct!"] * 3 +
                                      ["10 points to Gryffindor!", "Yay!", "Woo-hoo!"])
             self.feedback_text_frame.insert(tk.END, feedback, "green")
@@ -355,9 +375,11 @@ class MarkDramaFlashcards:
             feedback_wrong = random.choice(["Don't stop, you can do it!\n", "Don't give up!\n",
                                             "Time for a cookie?\n"] + [""]*10)
             feedback_correct = self.mode2_correct_answer
-            self.feedback_text_frame.insert(tk.END, f"'{user_answer}' is incorrect.\n", "red")
+            self.feedback_text_frame.insert(tk.END, f"'{user_answer}: {alternatives[user_answer]}' is incorrect.\n",
+                                            "red")
             self.feedback_text_frame.insert(tk.END, f'{feedback_wrong}', "red")
-            self.feedback_text_frame.insert(tk.END, f"'{feedback_correct}' is the correct answer.", "green")
+            self.feedback_text_frame.insert(tk.END, f"'{correct_answer}: {self.mode2_correct_answer}' "
+                                                    f"was the correct answer.", "green")
 
         # Update the performance record below the "Next Question" button
         self.score["total"] += 1  # Increment total questions
@@ -376,8 +398,7 @@ class MarkDramaFlashcards:
 
     def next_mode2_question(self):
         # Select a new random question from the dictionary
-        self.mode2_question_number = random.choice(list(self.mode2_correct_answers.keys()))
-        self.mode2_correct_answer = self.mode2_correct_answers[self.mode2_question_number]
+        self.mode2_question = random.choice(self.event_sequence)
 
         # Enable answer buttons
         for button in self.mode2_answer_buttons:
@@ -385,29 +406,43 @@ class MarkDramaFlashcards:
         self.update_mode2_question()
 
     def update_mode2_question(self):
-        print(self.questions)
-        # Pick a Part
-        self.random_part = random.choice(list(self.questions.keys()))
-        # Generate a Question Based on Events in that Part
-        the_question = self.questions[self.random_part]
-        self.random_question = random.choice(the_question)
+        # Generate new question
+        self.mode2_question = random.choice(self.event_sequence[1:-1])
+        before_or_after = random.choice(["before", "after"])
+        after_question = self.event_sequence.index(self.mode2_question) + 1
+        before_question = self.event_sequence.index(self.mode2_question) - 1
 
-        self.mode2_question_label.config(text=f"What comes after {self.random_question}?", fg="black")
+        self.mode2_correct_answer = self.event_sequence[after_question] if before_or_after == "after" else \
+            self.event_sequence[before_question]
+        self.mode2_question_label.config(text=f"What comes immediately {before_or_after} '{self.mode2_question}'?",
+                                         fg="black")
 
-        # Generate new answer options
-        answer_options = list(self.mode2_correct_answers.values())[:4]
-        #answer_options = the_question[:4]
-        random.shuffle(answer_options)
+        # Generate the potential answers based on the selected parts.
+        four_options = [self.mode2_correct_answer]
+        if len(self.event_sequence) < 4:
+            msg.showerror("Oops", "You can't play multichoice with fewer than 4 options. Please add more to the"
+                                  "event order text file.")
+            raise KeyError("Not enough options given in event order. Add more please ; - ; ")
 
-        # Ensure the correct answer is in the answer options
-        if self.mode2_correct_answer not in answer_options:
-            # Replace one of the random answers with the correct answer
-            random_index = random.randint(0, 3)
-            answer_options[random_index] = self.mode2_correct_answer
+        sneaky = False
+        while len(four_options) < 4:
+            # Ensure there's a sneaky one very close in sequence to the correct answer.
+            if sneaky:
+                _new = random.choice(self.event_sequence)
+            else:
+                offset = random.randint(-2, 2)
+                index_to_pick = self.event_sequence.index(self.mode2_correct_answer) + offset
+                # Ensure the index is within a valid range
+                index_to_pick = max(0, min(index_to_pick, len(self.event_sequence)-1))
 
-        for i in range(4):
-            self.mode2_answer_buttons[i].config(text=answer_options[i],
-                                                command=lambda ans=answer_options[i]: self.check_mode2_answer(ans))
+                _new = self.event_sequence[index_to_pick]
+                sneaky = True
+            if _new not in four_options:
+                four_options.append(_new)
+        random.shuffle(four_options)
+        self.mode2_answer_options = "A: {}\nB: {}\nC: {} \nD: {}\n" \
+                                    .format(*[i for i in four_options])
+        self.mode2_answer_label.config(text=self.mode2_answer_options, justify='left')
 
         self.feedback_text_frame.config(state=tk.NORMAL)
         self.feedback_text_frame.delete(1.0, tk.END)  # Clear previous content
