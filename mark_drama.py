@@ -20,6 +20,7 @@ import tkinter as tk
 import tkinter.messagebox as msg
 from tkinter import *
 
+from copy import deepcopy
 import random
 
 UNEXPECTED_ERROR_MSG = "Unexpected error, sorry! Tell Josh or someone who knows python."
@@ -27,16 +28,18 @@ UNEXPECTED_ERROR_MSG = "Unexpected error, sorry! Tell Josh or someone who knows 
 
 class MarkDramaFlashcards:
     def __init__(self, root, _dialogue, _events):
+        self.remaining_label = None
         self.questions = dict()
+        self.mode1_questions = dict()
         self.dialogue = _dialogue
-        self.random_question = None
-        self.random_part = None
+        self.mode1_random_question = None
         self.events = _events
         self.event_sequence = []
         self.root = root
         self.root.title("Mark Drama Game")
         self.root.geometry("800x600")  # Set default window size
         self.parts_to_include = []
+        self.mode2_config_option = tk.StringVar()
         self.create_title_screen()
         self.score = dict()
         self.reset_score()
@@ -63,15 +66,22 @@ class MarkDramaFlashcards:
         self.mode1_correct_answer = None
         self.mode1_user_answer = None
         self.mode1_question = None
+        self.reveal_answer_button = None
         self.mode1_next_button = None
         self.selected_dialogue = None
         self.selected_parts = None
+        self.total_questions = 0
+        self.remaining_questions = None
+
+        self.before_only = False
+        self.after_only = False
 
     def reset_score(self):
         self.score = {"correct": 0, "total": 0}  # Initialize score
 
     def update_score_label(self):
         self.score_label.config(text=f"Score for this Session: {self.score['correct']}/{self.score['total']} correct")
+        self.remaining_label.config(text=f"Remaining: {len(self.remaining_questions)}/{self.total_questions}")
 
     # ---------------------------------------------------------------------------------------------------------------- #
     # Title Screen Starts Here
@@ -89,40 +99,70 @@ class MarkDramaFlashcards:
         mode2_button = tk.Button(mode_frame, text="Multiple Choice", font=("Helvetica", 16), command=self.start_mode2)
         mode2_button.pack(side=tk.LEFT, padx=20)  # Add side and padding for separation
 
-        # Create a frame for the checkboxes
-        checkboxes_frame = tk.Frame(self.root)
-        checkboxes_frame.pack()
-
-        # Checkbox for "Jesus Dialogue" in italics
-        jesus_mode_var = tk.IntVar()
-        jesus_mode_checkbox = tk.Checkbutton(checkboxes_frame, text="Jesus Dialogue", font=("Helvetica", 12, "italic"),
-                                             variable=jesus_mode_var)
-        jesus_mode_checkbox.grid(row=0, column=0, padx=10)  # Grid layout for the first checkbox
-
-        # Checkbox for "Pharisee Dialogue" in italics
-        pharisee_mode = tk.IntVar()
-        pharisee_mode_checkbox = tk.Checkbutton(checkboxes_frame, text="Pharisee Dialogue",
-                                                font=("Helvetica", 12, "italic"), variable=pharisee_mode)
-        pharisee_mode_checkbox.grid(row=0, column=1, padx=10)  # Grid layout for the second checkbox
+        # Create a frame for the part checkboxes
+        part_checkboxes_frame = tk.Frame(self.root)
+        part_checkboxes_frame.pack()
 
         divider = tk.Frame(self.root, height=2, bg="black")
         divider.pack(fill=tk.X, padx=20, pady=10)  # Divider below the buttons
 
         # Create a frame for checkboxes
         # Create a LabelFrame to enclose the checkbox frame
-        checkbox_label_frame = tk.LabelFrame(self.root, text="Parts to Include", font=("Helvetica", 14, "bold"))
-        checkbox_label_frame.pack(padx=20, pady=10)
+        part_checkbox_label_frame = tk.LabelFrame(self.root, text="Parts to Include", font=("Helvetica", 14, "bold"))
+        part_checkbox_label_frame.pack(padx=20, pady=10)
 
         # Place the checkboxes inside the LabelFrame
         for i in range(1, 4):
-            checkbox = tk.Checkbutton(checkbox_label_frame, text=f"Part {i}", font=("Helvetica", 12, "bold"),
+            checkbox = tk.Checkbutton(part_checkbox_label_frame, text=f"Part {i}", font=("Helvetica", 12, "bold"),
                                       command=lambda part=i: self.toggle_part(part))
             checkbox.grid(row=0, column=i - 1, padx=20, pady=5)  # Grid layout for the first row
 
         for i in range(4, 7):
-            checkbox = tk.Checkbutton(checkbox_label_frame, text=f"Part {i}", font=("Helvetica", 12, "bold"),
+            checkbox = tk.Checkbutton(part_checkbox_label_frame, text=f"Part {i}", font=("Helvetica", 12, "bold"),
                                       command=lambda part=i: self.toggle_part(part))
             checkbox.grid(row=1, column=i - 4, padx=20, pady=5)  # Grid layout for the second row
+
+        # Create a frame to hold the radio buttons
+        mode2_config_frame = tk.LabelFrame(self.root, text="Multi-Choice Config", font=("Helvetica", 14, "bold"), padx=80)
+        mode2_config_frame.pack()
+
+
+        # Create three radio buttons
+        radio_button1 = tk.Radiobutton(mode2_config_frame,
+                                       text="Both",
+                                       variable=self.mode2_config_option,
+                                       value="Both",
+                                       command=self.configure_mode2,
+                                       font=("Helvetica", 12))
+        radio_button2 = tk.Radiobutton(mode2_config_frame,
+                                       text="Only 'After' questions",
+                                       variable=self.mode2_config_option,
+                                       value="After",
+                                       command=self.configure_mode2,
+                                       font=("Helvetica", 12))
+        radio_button3 = tk.Radiobutton(mode2_config_frame,
+                                       text="Only 'Before' questions",
+                                       variable=self.mode2_config_option,
+                                       value="Before",
+                                       command=self.configure_mode2,
+                                       font=("Helvetica", 12))
+        radio_button1.select()
+
+        # Pack the radio buttons within the frame
+        radio_button1.pack()
+        radio_button2.pack()
+        radio_button3.pack()
+
+    def configure_mode2(self):
+        if self.mode2_config_option.get() == "Before":
+            self.after_only = False
+            self.before_only = True
+        elif self.mode2_config_option.get() == "After":
+            self.after_only = True
+            self.before_only = False
+        else:
+            self.after_only = False
+            self.before_only = False
 
     def toggle_part(self, part_number):
         if part_number in self.parts_to_include:
@@ -135,6 +175,7 @@ class MarkDramaFlashcards:
         mode_name = "Flashcards" if mode == 1 else "Multichoice"
         print(f"Launching {mode_name} with parts: {self.parts_to_include}")
 
+        # Mode is 1
         if mode == 1:
             for k in self.dialogue.keys():
                 part_num = NUMBER_MAP[k]
@@ -170,7 +211,13 @@ class MarkDramaFlashcards:
         if not self.parts_to_include:
             print("No parts given, will default to just part 1")
             self.toggle_part(1)
-        self.questions = self.get_questions()
+        questions = self.get_questions()
+        self.mode1_questions = dict()
+        self.remaining_questions = dict()
+        for part in questions.values():
+            self.mode1_questions.update(part)
+            self.remaining_questions.update(part)
+        self.total_questions = len(self.remaining_questions)
         self.reset_score()
         self.reset_mode1()
         self.create_mode1_window()
@@ -222,12 +269,17 @@ class MarkDramaFlashcards:
         self.score_label = tk.Label(grid_frame, text="Score for this Session: 0/0 correct", font=("Helvetica", 14))
         self.score_label.grid(row=7, column=0, columnspan=2, pady=10)
 
+        self.remaining_label = tk.Label(grid_frame, text=f"Remaining: "
+                                                         f"{len(self.remaining_questions)}/{self.total_questions}",
+                                        font=("Helvetica", 14))
+        self.remaining_label.grid(row=8, column=0, columnspan=2, pady=10)
+
         self.update_mode1_question()
 
     def reveal_mode1_answer(self):
         # Get the correct answer
-        if self.random_question:
-            answers = self.questions[self.random_part][self.random_question]
+        if self.mode1_random_question:
+            answers = self.mode1_questions[self.mode1_random_question]
             correct_answer = ""
             for i in answers:
                 correct_answer += f"{i}\n"
@@ -248,18 +300,16 @@ class MarkDramaFlashcards:
         self.reveal_answer_button.config(state=tk.DISABLED)
 
     def update_mode1_question(self):
-        # Pick a Part
-        self.random_part = random.choice(list(self.questions.keys()))
-        # Generate a Question Based on Events in that Part
-        the_question = self.questions[self.random_part]
-        try:
-            self.random_question = random.choice(list(the_question.keys()))
-        except IndexError:
-            print("This is causing trouble: ", the_question)
-            msg.showerror("Oops", UNEXPECTED_ERROR_MSG)
-            exit()
-        new_question = f"[{self.random_question}]" + \
-                       "\n What does Jesus do here?"
+        print(len(self.remaining_questions))
+        if len(self.remaining_questions) == 0:
+            msg.showinfo("Yay", f"You got through all the questions :) \n"
+                                f"Your score was: {self.score['correct']}/{self.score['total']}.\n"
+                                f"You were playing with Parts: {self.parts_to_include}.")
+            self.mode1_window.destroy()
+            return
+        self.mode1_random_question = random.choice(list(self.remaining_questions.keys()))
+        new_question = f"[{self.mode1_random_question}]" + \
+                       "\n What happens here?"
 
         # Clear the user's input field and update the question
         self.mode1_entry.delete(1.0, tk.END)
@@ -282,6 +332,7 @@ class MarkDramaFlashcards:
         self.mode1_next_button.config(state=tk.NORMAL)
         self.correct_button.config(state=tk.DISABLED)
         self.wrong_button.config(state=tk.DISABLED)
+        self.remaining_questions.pop(self.mode1_random_question)
         self.update_score_label()
 
     def wrong_mode1_answer(self):
@@ -300,7 +351,9 @@ class MarkDramaFlashcards:
             self.toggle_part(1)
         # Select a random question from the dictionary
         self.questions, self.event_sequence = self.get_questions(mode=2)
-        self.mode2_question = random.choice(self.event_sequence)
+        self.remaining_questions = deepcopy(self.event_sequence)
+        self.total_questions = len(self.remaining_questions)
+        self.mode2_question = random.choice(self.remaining_questions)
         self.create_mode2_window()
 
     def create_mode2_window(self):
@@ -308,7 +361,7 @@ class MarkDramaFlashcards:
         self.mode2_window = tk.Toplevel(self.root)
         self.reset_score()
         self.mode2_window.title("Mark Drama Multi-Choice")
-        self.mode2_window.geometry("1100x640")
+        self.mode2_window.geometry("1100x680")
 
         self.mode2_question_label = tk.Label(self.mode2_window,
                                              text=f"What comes immediately after ERROR / BROKEN?",
@@ -330,7 +383,7 @@ class MarkDramaFlashcards:
         self.mode2_answer_buttons = []
 
         for i in range(4):
-            answer_button = tk.Button(self.mode2_window, text=abcd[i], font=("Helvetica", 14),
+            answer_button = tk.Button(self.mode2_window, text=abcd[i], font=("Helvetica", 24),
                                       command=lambda ans=abcd[i]: self.check_mode2_answer(ans), padx=80)
             answer_button.grid(row=i // 2 + row, column=i % 2, padx=20, pady=10)
             self.mode2_answer_buttons.append(answer_button)
@@ -351,6 +404,11 @@ class MarkDramaFlashcards:
                                     font=("Helvetica", 14))
         self.score_label.grid(row=row, column=0, columnspan=2, pady=10)
         row += 1
+        self.remaining_label = tk.Label(self.mode2_window,
+                                        text=f"Remaining: {len(self.remaining_questions)}/{self.total_questions}",
+                                        font=("Helvetica", 14))
+        self.remaining_label.grid(row=row, column=0, columnspan=2, pady=10)
+        row += 1
         self.update_mode2_question()
 
     def check_mode2_answer(self, user_answer):
@@ -367,10 +425,13 @@ class MarkDramaFlashcards:
         correct_answer = answers[self.mode2_correct_answer]
 
         if user_answer == correct_answer:
-            feedback = random.choice(["You got it!", "Correct!"] * 3 +
-                                     ["10 points to Gryffindor!", "Yay!", "Woo-hoo!"])
+            feedback = f"Correct! '{correct_answer}: {self.mode2_correct_answer}' is the right answer!\n"
+            feedback += random.choice(["You got it!", "Fantastic!"] * 3 +
+                                      ["10 points to Gryffindor!", "Hallelujah!", "Yay!", "Woo-hoo!"])
             self.feedback_text_frame.insert(tk.END, feedback, "green")
             self.score["correct"] += 1  # Increment correct score
+            # Pop the remaining questions
+            self.remaining_questions.pop(self.remaining_questions.index(self.mode2_question))
         else:
             feedback_wrong = random.choice(["Don't stop, you can do it!\n", "Don't give up!\n",
                                             "Time for a cookie?\n"] + [""]*10)
@@ -397,8 +458,15 @@ class MarkDramaFlashcards:
             button.config(state=tk.DISABLED)
 
     def next_mode2_question(self):
-        # Select a new random question from the dictionary
-        self.mode2_question = random.choice(self.event_sequence)
+        # Select a new random question from the dictionary or terminate the game session if the player has done all.
+        if self.remaining_questions:
+            self.mode2_question = random.choice(self.remaining_questions)
+        else:
+            msg.showinfo("Yay", f"You got through all the questions :) \n"
+                                f"Your score was: {self.score['correct']}/{self.score['total']}.\n"
+                                f"You were playing with Parts: {self.parts_to_include}.")
+            self.mode2_window.destroy()
+            return
 
         # Enable answer buttons
         for button in self.mode2_answer_buttons:
@@ -407,39 +475,48 @@ class MarkDramaFlashcards:
 
     def update_mode2_question(self):
         # Generate new question
-        self.mode2_question = random.choice(self.event_sequence[1:-1])
+        if len(self.remaining_questions) > 2:
+            self.mode2_question = random.choice(self.remaining_questions[1:-1])
+        else:
+            self.mode2_question = self.remaining_questions[0]
+
         before_or_after = random.choice(["before", "after"])
+        if self.after_only:
+            before_or_after = "after"
+        elif self.before_only:
+            before_or_after = "before"
         after_question = self.event_sequence.index(self.mode2_question) + 1
         before_question = self.event_sequence.index(self.mode2_question) - 1
 
         self.mode2_correct_answer = self.event_sequence[after_question] if before_or_after == "after" else \
             self.event_sequence[before_question]
-        self.mode2_question_label.config(text=f"What comes immediately {before_or_after} '{self.mode2_question}'?",
+        self.mode2_question_label.config(text=f"What comes immediately {before_or_after}...\n'{self.mode2_question}'",
                                          fg="black")
 
         # Generate the potential answers based on the selected parts.
         four_options = [self.mode2_correct_answer]
-        if len(self.event_sequence) < 4:
-            msg.showerror("Oops", "You can't play multichoice with fewer than 4 options. Please add more to the"
-                                  "event order text file.")
-            raise KeyError("Not enough options given in event order. Add more please ; - ; ")
+        if len(self.event_sequence) < 5:
+            msg.showerror("Oops", "You can't play multichoice with fewer than 5 options. Please add more to the"
+                                  " event order text file.")
+            exit()
 
-        sneaky = False
+        sneaky = 0
         while len(four_options) < 4:
             # Ensure there's a sneaky one very close in sequence to the correct answer.
-            if sneaky:
+            if sneaky >= 2:
                 _new = random.choice(self.event_sequence)
             else:
-                offset = random.randint(-2, 2)
+                offset = random.randint(-3, 3)
                 index_to_pick = self.event_sequence.index(self.mode2_correct_answer) + offset
                 # Ensure the index is within a valid range
                 index_to_pick = max(0, min(index_to_pick, len(self.event_sequence)-1))
 
                 _new = self.event_sequence[index_to_pick]
-                sneaky = True
-            if _new not in four_options:
+                sneaky += 1
+            if _new not in four_options and _new not in self.mode2_question:
                 four_options.append(_new)
         random.shuffle(four_options)
+
         self.mode2_answer_options = "A: {}\nB: {}\nC: {} \nD: {}\n" \
                                     .format(*[i for i in four_options])
         self.mode2_answer_label.config(text=self.mode2_answer_options, justify='left')
@@ -498,9 +575,6 @@ def parse_dialogue_to_dict():
                 entries[current_part][current_event] = []
             else:
                 # Its dialogue or event notes.
-                if not line.startswith("*") and not line.startswith("'"):
-                    # JC is Jesus Christ
-                    line = "JC: " + line
                 entries[current_part][current_event].append(line.strip())
     return entries
 
