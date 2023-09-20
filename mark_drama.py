@@ -125,7 +125,7 @@ class MarkDramaFlashcards:
             checkbox.grid(row=1, column=i - 4, padx=20, pady=5)  # Grid layout for the second row
 
         # Create a frame to hold the radio buttons
-        mode2_config_frame = tk.LabelFrame(self.root, text="Multi-Choice Config", font=("Helvetica", 14, "bold"), padx=80)
+        mode2_config_frame = tk.LabelFrame(self.root, text="Multi-choice Event Sequence", font=("Helvetica", 13, "bold"), padx=80)
         mode2_config_frame.pack()
 
 
@@ -148,15 +148,16 @@ class MarkDramaFlashcards:
         #                                value="Before",
         #                                command=self.configure_mode2,
         #                                font=("Helvetica", 12))
-        # Josh changed his mind about how this should work
+
+        # Josh changed his mind about how this should work since the play doesn't play backwards.
         radio_button3 = tk.Radiobutton(mode2_config_frame,
-                                       text="Randomized Events",
+                                       text="Randomized",
                                        variable=self.mode2_config_option,
                                        value="After",
                                        command=self.configure_mode2,
                                        font=("Helvetica", 12))
         radio_button4 = tk.Radiobutton(mode2_config_frame,
-                                       text="Ordered Events",
+                                       text="In Order",
                                        variable=self.mode2_config_option,
                                        value="Ordered",
                                        command=self.configure_mode2,
@@ -230,8 +231,8 @@ class MarkDramaFlashcards:
 
     def start_mode1(self):
         if not self.parts_to_include:
-            print("No parts given, will default to just part 1")
-            self.toggle_part(1)
+            msg.showerror("Oops", "You've not selected any parts!")
+            return
         questions = self.get_questions()
         self.mode1_questions = dict()
         self.remaining_questions = dict()
@@ -365,11 +366,10 @@ class MarkDramaFlashcards:
 
     # ---------------------------------------------------------------------------------------------------------------- #
     # Mode 2 Starts Here
-
     def start_mode2(self):
         if not self.parts_to_include:
-            print("No parts given, will default to just part 1")
-            self.toggle_part(1)
+            msg.showerror("Oops", "You've not selected any parts!")
+            return
         # Select a random question from the dictionary
         self.questions, self.event_sequence = self.get_questions(mode=2)
         self.remaining_questions = deepcopy(self.event_sequence)
