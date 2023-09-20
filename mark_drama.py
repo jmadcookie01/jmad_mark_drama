@@ -75,6 +75,8 @@ class MarkDramaFlashcards:
 
         self.before_only = False
         self.after_only = False
+        self.mode2_ordered = None
+        self.mode2_index = 0
 
     def reset_score(self):
         self.score = {"correct": 0, "total": 0}  # Initialize score
@@ -128,32 +130,47 @@ class MarkDramaFlashcards:
 
 
         # Create three radio buttons
-        radio_button1 = tk.Radiobutton(mode2_config_frame,
-                                       text="Both",
-                                       variable=self.mode2_config_option,
-                                       value="Both",
-                                       command=self.configure_mode2,
-                                       font=("Helvetica", 12))
-        radio_button2 = tk.Radiobutton(mode2_config_frame,
-                                       text="Only 'After' questions",
+        # radio_button1 = tk.Radiobutton(mode2_config_frame,
+        #                                text="Both",
+        #                                variable=self.mode2_config_option,
+        #                                value="Both",
+        #                                command=self.configure_mode2,
+        #                                font=("Helvetica", 12))
+        # radio_button2 = tk.Radiobutton(mode2_config_frame,
+        #                                text="Only 'After' questions",
+        #                                variable=self.mode2_config_option,
+        #                                value="After",
+        #                                command=self.configure_mode2,
+        #                                font=("Helvetica", 12))
+        # radio_button3 = tk.Radiobutton(mode2_config_frame,
+        #                                text="Only 'Before' questions",
+        #                                variable=self.mode2_config_option,
+        #                                value="Before",
+        #                                command=self.configure_mode2,
+        #                                font=("Helvetica", 12))
+        # Josh changed his mind about how this should work
+        radio_button3 = tk.Radiobutton(mode2_config_frame,
+                                       text="Randomized Events",
                                        variable=self.mode2_config_option,
                                        value="After",
                                        command=self.configure_mode2,
                                        font=("Helvetica", 12))
-        radio_button3 = tk.Radiobutton(mode2_config_frame,
-                                       text="Only 'Before' questions",
+        radio_button4 = tk.Radiobutton(mode2_config_frame,
+                                       text="Ordered Events",
                                        variable=self.mode2_config_option,
-                                       value="Before",
+                                       value="Ordered",
                                        command=self.configure_mode2,
                                        font=("Helvetica", 12))
-        radio_button1.select()
+        radio_button3.select()
 
         # Pack the radio buttons within the frame
-        radio_button1.pack()
-        radio_button2.pack()
+        # radio_button1.pack()
+        # radio_button2.pack()
         radio_button3.pack()
+        radio_button4.pack()
 
     def configure_mode2(self):
+        self.mode2_ordered = False
         if self.mode2_config_option.get() == "Before":
             self.after_only = False
             self.before_only = True
@@ -162,6 +179,10 @@ class MarkDramaFlashcards:
             self.before_only = False
         else:
             self.after_only = False
+            self.before_only = False
+        if self.mode2_config_option.get() == "Ordered":
+            self.mode2_ordered = True
+            self.after_only = True
             self.before_only = False
 
     def toggle_part(self, part_number):
@@ -478,6 +499,8 @@ class MarkDramaFlashcards:
         if len(self.remaining_questions) > 2:
             self.mode2_question = random.choice(self.remaining_questions[1:-1])
         else:
+            self.mode2_question = self.remaining_questions[0]
+        if self.mode2_ordered:
             self.mode2_question = self.remaining_questions[0]
 
         before_or_after = random.choice(["before", "after"])
