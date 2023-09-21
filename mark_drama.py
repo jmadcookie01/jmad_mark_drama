@@ -74,7 +74,7 @@ class MarkDramaFlashcards:
         self.remaining_questions = None
 
         self.before_only = False
-        self.after_only = False
+        self.after_only = True
         self.mode_ordered = True
         self.mode2_index = 0
 
