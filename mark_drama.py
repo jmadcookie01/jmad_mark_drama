@@ -1,11 +1,8 @@
 """
 This is a simple Python project using builtin libraries that generates a flash card application.
-It has two game modes, each with two options "Type" and "Click":
+It has two game modes:
  - Flashcards (Specific Dialogue AND Event Order)
  - Multiple Choice (Just Event Order)
-
-If you check the Jesus lines box, all lines for Jesus will be included as potential questions.
-NOTE: This does not affect Multiple Choice.
 
 User Notes:
 You can update the knowledge base in a text editor like Notepad.
